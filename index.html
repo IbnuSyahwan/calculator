@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Electricity Bill Calculator</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body { background-color: #f4f6f9; }
+        .card-header { background-color: #17a2b8; color: #fff; }
+        .summary-box { background: #fff; border-radius: .5rem; padding: 1rem; text-align: center; height: 100%; }
+        .summary-box h6 { color: #6c757d; text-transform: uppercase; font-size: .8rem; margin-bottom: .5rem; }
+        .summary-box .value { font-size: 1.5rem; font-weight: 700; color: #17a2b8; }
+        .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: #6c757d;
+            color: #fff;
+            font-size: .7rem;
+            font-weight: 700;
+            cursor: help;
+            vertical-align: middle;
+            text-decoration: none;
+        }
+        .help-icon:hover { background-color: #17a2b8; color: #fff; }
+        #resultsSection { display: none; }
+    </style>
+</head>
+<body>
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Electricity Calculator</h4>
+                </div>
+                <div class="card-body">
+
+                    <div class="alert alert-danger" id="errorBox" style="display:none;"></div>
+
+                    <form id="calcForm">
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <label>Voltage (V)</label>
+                                <input type="number" name="voltage" id="voltage" class="form-control" min="0.01" step="any" required>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label>Current (A)</label>
+                                <input type="number" name="current" id="current" class="form-control" min="0.01" step="any" required>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label>Current Rate (sen/kWh)
+                                    <a href="https://www.mytnb.com.my/tariff/index.html?lang=bm&v=1.1.65#schedule"
+                                       target="_blank" rel="noopener noreferrer" class="help-icon"
+                                       title="The price your electricity provider charges per kilowatt-hour (kWh), in sen. Click to check TNB's tariff schedule.">?</a>
+                                </label>
+                                <input type="number" name="rate" id="rate" class="form-control" min="0.01" step="any" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="col-md-8">
+                                <button type="submit" class="btn btn-info btn-block">Calculate</button>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="button" class="btn btn-secondary btn-block" onclick="window.location.reload();">Reset</button>
+                            </div>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+
+            <div id="resultsSection">
+                <div class="row mb-4">
+                    <div class="col-6 col-md-4 mb-3">
+                        <div class="summary-box shadow-sm">
+                            <h6>Power</h6>
+                            <div class="value" id="powerValue"></div>
+                            <small class="text-muted">Kilowatt (kW)</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 mb-3">
+                        <div class="summary-box shadow-sm">
+                            <h6>Charge / Hour</h6>
+                            <div class="value" id="chargeHourValue"></div>
+                            <small class="text-muted" id="chargeHourRate"></small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 mb-3">
+                        <div class="summary-box shadow-sm">
+                            <h6>Charge / Day</h6>
+                            <div class="value" id="chargeDayValue"></div>
+                            <small class="text-muted" id="chargeDayHours"></small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header">
+                        <h5 class="mb-0">24-Hour Breakdown</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Hour</th>
+                                        <th>Energy (kWh)</th>
+                                        <th>Total Charge (RM)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="breakdownBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    const maxHours = 24;
+
+    function getPower(v, i) {
+        return v * i;
+    }
+
+    function getEnergy(watts, hours) {
+        return (watts * hours) / 1000;
+    }
+
+    function getCost(kwh, rate) {
+        return kwh * (rate / 100);
+    }
+
+    document.getElementById("calcForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const voltage = document.getElementById("voltage").value;
+        const current = document.getElementById("current").value;
+        const rate = document.getElementById("rate").value;
+
+        const errorBox = document.getElementById("errorBox");
+        const resultsSection = document.getElementById("resultsSection");
+
+        const v = parseFloat(voltage);
+        const i = parseFloat(current);
+        const r = parseFloat(rate);
+
+        if (voltage === "" || current === "" || rate === "" || isNaN(v) || isNaN(i) || isNaN(r)) {
+            errorBox.textContent = "Please enter valid numbers for voltage, current and rate.";
+            errorBox.style.display = "block";
+            resultsSection.style.display = "none";
+            return;
+        }
+        if (v <= 0 || i <= 0 || r <= 0) {
+            errorBox.textContent = "Voltage, current and rate must be greater than 0.";
+            errorBox.style.display = "block";
+            resultsSection.style.display = "none";
+            return;
+        }
+
+        errorBox.style.display = "none";
+
+        const power = getPower(v, i);
+        const energyArr = [];
+        const totalChargeArr = [];
+
+        for (let h = 0; h < maxHours; h++) {
+            const hour = h + 1;
+            energyArr[h] = getEnergy(power, hour);
+            totalChargeArr[h] = getCost(energyArr[h], r);
+        }
+
+        document.getElementById("powerValue").textContent = (power / 1000.0).toFixed(5);
+        document.getElementById("chargeHourValue").textContent = "RM " + totalChargeArr[0].toFixed(4);
+        document.getElementById("chargeHourRate").textContent = "at " + rate + " sen/kWh";
+        document.getElementById("chargeDayValue").textContent = "RM " + totalChargeArr[maxHours - 1].toFixed(2);
+        document.getElementById("chargeDayHours").textContent = maxHours + " hours";
+
+        const tbody = document.getElementById("breakdownBody");
+        tbody.innerHTML = "";
+        for (let h = 0; h < maxHours; h++) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = "<td>" + (h + 1) + "</td>" +
+                "<td>" + energyArr[h].toFixed(5) + "</td>" +
+                "<td>" + totalChargeArr[h].toFixed(2) + "</td>";
+            tbody.appendChild(tr);
+        }
+
+        resultsSection.style.display = "block";
+    });
+</script>
+</body>
+</html>
